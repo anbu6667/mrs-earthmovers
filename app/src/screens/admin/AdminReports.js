@@ -1,0 +1,213 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { useAuth } from '../../context/AuthContext';
+import apiService from '../../services/apiService';
+import styles from '../../styles/styles';
+import { PREMIUM_LIGHT } from '../../styles/tokens';
+
+const AdminReports = ({ navigation }) => {
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [dailyReport, setDailyReport] = useState(null);
+  const [monthlyReport, setMonthlyReport] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
+  const { user } = useAuth();
+
+  const loadReports = async () => {
+    try {
+      setLoading(true);
+      await Promise.all([fetchDailyReport(), fetchMonthlyReport()]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDailyReport = async () => {
+    try {
+      const response = await apiService.getDailyReport(selectedDate);
+      setDailyReport(response.data.data);
+    } catch (error) {
+      console.error('Error fetching daily report:', error);
+    }
+  };
+
+  const fetchMonthlyReport = async () => {
+    try {
+      const response = await apiService.getMonthlyReport(selectedYear, selectedMonth);
+      setMonthlyReport(response.data.data);
+    } catch (error) {
+      console.error('Error fetching monthly report:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadReports();
+  }, [selectedDate, selectedMonth, selectedYear]);
+
+  const onRefresh = async () => {
+    try {
+      setRefreshing(true);
+      await loadReports();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const asCount = (value) => {
+    if (Array.isArray(value)) return value.length;
+    if (typeof value === 'number') return value;
+    return 0;
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={[styles.header, { marginTop: 16 }]}> // moved slightly down
+        <Text style={styles.headerTitle}>Reports & Analytics</Text>
+        <Text style={{ fontSize: 16, color: PREMIUM_LIGHT.muted, textAlign: 'center', marginTop: 8 }}>
+          Business insights and analytics
+        </Text>
+      </View>
+
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          contentContainerStyle={{ padding: 16, paddingBottom: 24, flexGrow: 1 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.card}>
+            <Text style={styles.title}>Daily Report</Text>
+
+            <Text style={styles.label}>Date</Text>
+            <TextInput
+              style={styles.input}
+              value={selectedDate}
+              onChangeText={setSelectedDate}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={PREMIUM_LIGHT.muted}
+            />
+
+            {dailyReport ? (
+              <View style={styles.reportCard}>
+                <View style={styles.reportHeader}>
+                  <Text style={styles.reportTitle}>{formatDate(dailyReport.date)}</Text>
+                </View>
+
+                <View style={styles.statisticsContainer}>
+                  <View style={styles.statisticCard}>
+                    <Text style={styles.statisticValue}>{dailyReport.totalWorkRequests}</Text>
+                    <Text style={styles.statisticLabel}>Total Requests</Text>
+                  </View>
+                  <View style={styles.statisticCard}>
+                    <Text style={styles.statisticValue}>{asCount(dailyReport.completedWork)}</Text>
+                    <Text style={styles.statisticLabel}>Completed</Text>
+                  </View>
+                  <View style={styles.statisticCard}>
+                    <Text style={styles.statisticValue}>{dailyReport.totalVehicles}</Text>
+                    <Text style={styles.statisticLabel}>Vehicles Used</Text>
+                  </View>
+                  <View style={styles.statisticCard}>
+                    <Text style={styles.statisticValue}>₹{dailyReport.totalRevenue}</Text>
+                    <Text style={styles.statisticLabel}>Revenue</Text>
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <Text style={styles.subtitle}>No daily report data.</Text>
+            )}
+
+            <Text style={[styles.title, { marginTop: 16 }]}>Monthly Report</Text>
+
+            <Text style={styles.label}>Month (1-12)</Text>
+            <TextInput
+              style={styles.input}
+              value={selectedMonth.toString()}
+              onChangeText={(value) => setSelectedMonth(parseInt(value, 10) || 1)}
+              placeholder="1-12"
+              keyboardType="numeric"
+              placeholderTextColor={PREMIUM_LIGHT.muted}
+            />
+
+            <Text style={styles.label}>Year</Text>
+            <TextInput
+              style={styles.input}
+              value={selectedYear.toString()}
+              onChangeText={(value) => setSelectedYear(parseInt(value, 10) || new Date().getFullYear())}
+              placeholder="Year"
+              keyboardType="numeric"
+              placeholderTextColor={PREMIUM_LIGHT.muted}
+            />
+
+            {monthlyReport ? (
+              <View style={styles.reportCard}>
+                <View style={styles.reportHeader}>
+                  <Text style={styles.reportTitle}>
+                    {monthlyReport.year} - Month {monthlyReport.month}
+                  </Text>
+                </View>
+
+                <View style={styles.statisticsContainer}>
+                  <View style={styles.statisticCard}>
+                    <Text style={styles.statisticValue}>{monthlyReport.totalWorkRequests}</Text>
+                    <Text style={styles.statisticLabel}>Total Requests</Text>
+                  </View>
+                  <View style={styles.statisticCard}>
+                    <Text style={styles.statisticValue}>{asCount(monthlyReport.completedWork)}</Text>
+                    <Text style={styles.statisticLabel}>Completed</Text>
+                  </View>
+                  <View style={styles.statisticCard}>
+                    <Text style={styles.statisticValue}>{monthlyReport.totalVehicles}</Text>
+                    <Text style={styles.statisticLabel}>Vehicles Used</Text>
+                  </View>
+                  <View style={styles.statisticCard}>
+                    <Text style={styles.statisticValue}>₹{monthlyReport.totalRevenue}</Text>
+                    <Text style={styles.statisticLabel}>Revenue</Text>
+                  </View>
+                </View>
+
+                <Text style={[styles.title, { marginTop: 12 }]}>Revenue by Day</Text>
+                <View style={[styles.card, { marginHorizontal: 0 }]}>
+                  {Object.entries(monthlyReport.revenueByDay || {}).length === 0 ? (
+                    <Text style={styles.subtitle}>No revenue data.</Text>
+                  ) : (
+                    Object.entries(monthlyReport.revenueByDay || {}).map(([date, revenue]) => (
+                      <View key={date} style={styles.row}>
+                        <Text style={styles.subtitle}>{formatDate(date)}</Text>
+                        <Text style={styles.subtitle}>₹{revenue}</Text>
+                      </View>
+                    ))
+                  )}
+                </View>
+              </View>
+            ) : (
+              <Text style={styles.subtitle}>No monthly report data.</Text>
+            )}
+
+            <TouchableOpacity
+              style={[styles.button, styles.buttonSecondary]}
+              onPress={onRefresh}
+              disabled={loading}
+            >
+              <Text style={styles.buttonTextOnDark}>{loading ? 'Refreshing…' : 'Refresh Reports'}</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={PREMIUM_LIGHT.accent} />
+          <Text style={styles.loadingText}>Loading reports...</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+};
+
+export default AdminReports;
